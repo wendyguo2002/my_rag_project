@@ -20,19 +20,48 @@ index = VectorStoreIndex.from_vector_store(vector_store)
 
 # 3. CUSTOM SYSTEM PROMPT (The "Persona")
 # This tells the AI how to behave
-SYSTEM_PROMPT = (
-    "You are a helpful Career Assistant for a Software Engineer. "
-    "Use the provided context to answer questions about their projects. "
-    "Always focus on Technical Actions and Quantifiable Results. "
-    "If asked about a challenge, use the STAR method (Situation, Task, Action, Result)."
+system_prompt=(
+    "You are a Senior Technical Interview Coach. Wendy is the candidate.\n"
+    "Your goal: Provide a high-impact STAR answer using ONLY the provided context.\n\n"
+    "CRITICAL RULES:\n"
+    "1. METRICS FIRST: If you find numbers (latency, %, time saved), you MUST include them.\n"
+    "2. NO GENERALITIES: Instead of 'performance tools', say the specific tool (e.g., 'Cython' or 'Unity Profiler').\n"
+    "3. FORMAT: Use bold headers for **SITUATION**, **TASK**, **ACTION**, and **RESULT**.\n"
+    "4. ACCURACY: If a specific metric isn't in the context, do not invent one."
 )
 
-query_engine = index.as_query_engine(system_prompt=SYSTEM_PROMPT)
+# 1. Create a specialized Query Engine
+query_engine = index.as_query_engine(
+    similarity_top_k=5,  # Look at 5 chunks instead of 2 for more detail
+    system_prompt=(
+        "You are Wendy's Career Advocate. Your goal is to provide highly specific "
+        "interview answers using the STAR method. \n"
+        "RULES:\n"
+        "1. Use EXACT technical names (e.g., 'Cython', 'HoloLens', 'ChromaDB').\n"
+        "2. Include specific METRICS (e.g., '0.8ms', '40% reduction') if they exist.\n"
+        "3. If the context doesn't have the answer, say 'I don't have that specific data'.\n"
+        "4. Format clearly with SITUATION, TASK, ACTION, RESULT headers."
+    )
+)
 
-# 4. Ask a Test Question
+# 2. Run the Query
 question = "Tell me about a time you handled a technical conflict between teams."
-print(f"\nQuestion: {question}")
-
 response = query_engine.query(question)
-print("\n--- AI RESPONSE ---")
+
+# 3. Print the Result with Sources
+print("\n" + "="*30)
+print("CAREER ADVOCATE RESPONSE:")
+print("="*30)
+if response.source_nodes:
+    top_node = response.source_nodes[0]
+    print(f"\n🏆 TOP MATCH CONFIDENCE: {top_node.score:.4f}")
+    print(f"📄 EXCERPT: {top_node.node.get_content()[:200]}...")
 print(response)
+
+print("\n" + "-"*30)
+print("SOURCES USED:")
+for node in response.source_nodes:
+    # This prints the filename and the 'confidence' score (distance)
+    file_name = node.node.metadata.get('file_name', 'Unknown')
+    print(f"📍 File: {file_name} (Relevance: {node.score:.2f})")
+print("-"*30)
